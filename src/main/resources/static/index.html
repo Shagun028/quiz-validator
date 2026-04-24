@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Validator Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .controls {
+            padding: 30px;
+            background: #f8f9fa;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        .input-group {
+            flex: 1;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .btn:hover { transform: translateY(-2px); }
+        .btn-primary { background: #667eea; color: white; }
+        .btn-success { background: #48bb78; color: white; }
+        .btn-danger { background: #f56565; color: white; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        .leaderboard {
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        .leaderboard-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .progress-bar {
+            width: 100%;
+            height: 30px;
+            background: #e0e0e0;
+            border-radius: 15px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.5s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+        }
+        .log {
+            padding: 30px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: monospace;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .log-entry {
+            padding: 5px;
+            border-left: 3px solid #48bb78;
+            margin: 5px 0;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .leaderboard-item {
+            animation: slideIn 0.3s ease-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎯 Quiz Validator Dashboard</h1>
+            <p>Real-time Polling & Leaderboard Management</p>
+        </header>
+        
+        <div class="controls">
+            <div class="input-group">
+                <input type="text" id="regNo" placeholder="Registration Number" value="2024CS101">
+            </div>
+            <button class="btn btn-primary" onclick="startPolling()">🚀 Start Polling</button>
+            <button class="btn btn-success" id="submitBtn" onclick="submitLeaderboard()" disabled>📤 Submit</button>
+            <button class="btn btn-danger" onclick="resetApp()">🔄 Reset</button>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill">0%</div>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div>👥 Participants</div>
+                <div class="stat-value" id="participantCount">0</div>
+            </div>
+            <div class="stat-card">
+                <div>📊 Total Score</div>
+                <div class="stat-value" id="totalScore">0</div>
+            </div>
+            <div class="stat-card">
+                <div>🔄 Unique Events</div>
+                <div class="stat-value" id="uniqueEvents">0</div>
+            </div>
+            <div class="stat-card">
+                <div>📡 Poll Status</div>
+                <div class="stat-value" id="pollStatus">Idle</div>
+            </div>
+        </div>
+        
+        <div class="leaderboard">
+            <h2>🏆 Leaderboard</h2>
+            <div id="leaderboardList"></div>
+        </div>
+        
+        <div class="log">
+            <h3 style="color: white;">📋 Activity Log</h3>
+            <div id="logContainer"></div>
+        </div>
+    </div>
+    
+    <script>
+        let statusInterval;
+        
+        function startPolling() {
+            const regNo = document.getElementById('regNo').value;
+            addLog('Starting polling for: ' + regNo);
+            
+            fetch('/api/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ regNo: regNo })
+            })
+            .then(response => response.json())
+            .then(data => {
+                addLog(data.message);
+                document.getElementById('submitBtn').disabled = false;
+                startStatusPolling();
+            })
+            .catch(error => addLog('Error: ' + error.message, 'error'));
+        }
+        
+        function submitLeaderboard() {
+            addLog('Submitting leaderboard...');
+            fetch('/api/submit', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        addLog('✅ Submission successful! Total: ' + data.submittedTotal + ' points');
+                    } else {
+                        addLog('❌ Submission failed: ' + data.message);
+                    }
+                })
+                .catch(error => addLog('Submission error: ' + error.message));
+        }
+        
+        function resetApp() {
+            addLog('Resetting application...');
+            fetch('/api/reset', { method: 'POST' })
+                .then(() => {
+                    addLog('Reset complete');
+                    loadLeaderboard();
+                });
+        }
+        
+        function loadLeaderboard() {
+            fetch('/api/leaderboard')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('leaderboardList');
+                    if (data.leaderboard.length === 0) {
+                        container.innerHTML = '<div style="text-align:center;color:#999;">No data yet. Start polling!</div>';
+                        return;
+                    }
+                    container.innerHTML = data.leaderboard.map((entry, i) => `
+                        <div class="leaderboard-item">
+                            <span>#${i+1}</span>
+                            <span><strong>${entry.participant}</strong></span>
+                            <span style="color:#48bb78;font-weight:bold">${entry.totalScore} pts</span>
+                        </div>
+                    `).join('');
+                    document.getElementById('totalScore').innerText = data.totalScore;
+                });
+        }
+        
+        function startStatusPolling() {
+            if (statusInterval) clearInterval(statusInterval);
+            statusInterval = setInterval(() => {
+                fetch('/api/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('participantCount').innerText = data.participants || 0;
+                        document.getElementById('uniqueEvents').innerText = data.uniqueEvents || 0;
+                        const progress = ((data.currentPoll + 1) / 10) * 100;
+                        document.getElementById('progressFill').style.width = progress + '%';
+                        document.getElementById('progressFill').innerText = Math.round(progress) + '%';
+                        document.getElementById('pollStatus').innerText = data.isPolling ? 'Polling...' : 'Ready';
+                        loadLeaderboard();
+                    });
+            }, 1000);
+        }
+        
+        function addLog(message, type = 'info') {
+            const logContainer = document.getElementById('logContainer');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logContainer.insertBefore(logEntry, logContainer.firstChild);
+            while (logContainer.children.length > 50) logContainer.removeChild(logContainer.lastChild);
+        }
+        
+        loadLeaderboard();
+        startStatusPolling();
+    </script>
+</body>
+</html>
